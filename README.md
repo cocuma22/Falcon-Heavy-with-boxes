@@ -38,7 +38,7 @@ The animations realized are as follows:
 - interpolation of the background color from white to light blue to blue.
 
 ## Result
-The final result shows the *Falcon Heavy*, resting on the irregular terrain, with the fire and the smoke starting to come out of the engines. After, the rocket starts. As the rocket rises,  the background changes color from white to light blue to blue. Then the rocket reaches the space.
+The [final result](https://cocuma22.github.io/Falcon-Heavy-with-boxes/) shows the *Falcon Heavy*, resting on the irregular terrain, with the fire and the smoke starting to come out of the engines. After, the rocket starts. As the rocket rises,  the background changes color from white to light blue to blue. Then the rocket reaches the space.
 
 ![Razzo sulla base](/resources/base.jpeg)
 ![Razzo in cielo](/resources/sky.jpeg)
