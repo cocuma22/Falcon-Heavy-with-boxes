@@ -1,0 +1,296 @@
+<html>
+	<head>
+		<title>SpaceX - Falcon Heavy</title>
+		<style>
+		
+		body {
+			font-family: Monospace;
+			background-color: #f0f0f0;
+			margin: 0px;
+			overflow: hidden;
+		}
+		
+		canvas { 
+			width: 100%; 
+			height: 100%;
+		}
+	
+	</style>
+		<script src="lib/three.min.js"></script>
+		<script src="lib/stats.min.js"></script>
+		<script src="lib/Coordinates.js"></script>
+		<script src="lib/OrbitControls.js"></script>
+		<script src="lib/tween.min.js"></script>
+		<script src="functions.js"></script>
+	</head>
+	<body>
+		<script>
+		//global variables
+		var scene, camera, renderer, controls, stats, geometry, material, terrain, central_rocket, smoke_c, smoke_r, smoke_l, direction, tween, tweenColor1, tweenColor2, cubemap;
+
+		function Start() {
+			scene = new THREE.Scene();
+			camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 6000 );
+
+			renderer = new THREE.WebGLRenderer( {antialias: true} );
+			renderer.setPixelRatio(1);
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.setClearColor( 0xf0f0f0 );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.gammaInput = true;
+			renderer.gammaOutput = true;
+			renderer.shadowMap.enabled = true;
+			document.body.appendChild( renderer.domElement );
+			
+			camera.position.set(-30, 74, 70);
+			camera.lookAt( new THREE.Vector3(0, 0, 0) );
+			
+			geometry = new THREE.BoxGeometry(1,1,1);
+			material = new THREE.MeshPhongMaterial({color: 0xffffff});
+
+
+			//CUBEMAP------------------------------------------------------------
+			var path = "textures/cube/";
+			var format = '.png';
+			var urls = [
+					path + 'right' + format, path + 'left' + format,
+					path + 'top' + format, path + 'down' + format,
+					path + 'front' + format, path + 'back' + format
+				];
+			cubemap = new THREE.CubeTextureLoader().load( urls );
+			//-------------------------------------------------------------------
+
+
+			//BASE---------------------------------------------------------------
+			terrain = new THREE.Object3D();
+			var texture_base = new THREE.TextureLoader().load( 'textures/badrock.png' );
+			var material_base = new THREE.MeshPhongMaterial({map:texture_base});
+			var plane = Array(3600); //the texture image is 60x60
+			var counter = 0;
+			for(var i = 0; i < 60; i++) {
+				for(var j = 0; j < 60; j++) {
+					var c = new THREE.Mesh(geometry, material_base);
+					c.castShadow = true;
+					c.receiveShadow = true;
+					c.position.set(-30+j, 0, -30+i); //base centered in the origin
+					plane[counter] = c;
+					counter++;
+					terrain.add(c);
+				}
+			}
+			scene.add(terrain);
+			var img = new Image();
+			img.onload = function() {
+				//get height data from img
+				var data = getHeightData(img, 0.1);
+				for(var i = 0; i < plane.length; i++) {
+					plane[i].position.y = data[i]/2;
+					plane[i].scale.y = data[i];
+				}
+			};
+			//load img source
+			img.src = "textures/heightmap4.jpeg";
+
+			//move base
+			terrain.position.y = -7;
+			terrain.position.z = -20;
+			terrain.position.x = -13;
+			//-------------------------------------------------------------------
+
+
+			//ROCKET-------------------------------------------------------------
+			//CENTRAL ROCKET
+			central_rocket = new THREE.Object3D();
+			createBodyRocket(-2, 3, 4, 5, 42, central_rocket, material, true);
+			createHeadRocket(-3, 45, 5, 7, 7, central_rocket, 3, material);
+			writeSpaceX(central_rocket);
+			createBlackBase(central_rocket, 0, 2, 0, 9, 5);
+			createEngines(central_rocket, 0, 0.5, 0);
+			scene.add(central_rocket);
+			central_rocket.add(camera);
+
+			//LEFT ROCKET
+			var left_rocket = new THREE.Object3D();
+			createBodyRocket(-12, 3, 4, 5, 37, left_rocket, material, false);
+			createHeadRocket(-12, 40, 4, 5, 5, left_rocket, 2, material);
+			createBlackBase(left_rocket, -10, 2, 0, 9, 5);
+			createEngines(left_rocket, -10, 0.5, 0);
+			central_rocket.add(left_rocket);
+
+			//RIGHT ROCKET
+			var right_rocket = new THREE.Object3D();
+			createBodyRocket(8, 3, 4, 5, 37, right_rocket, material, false);
+			createHeadRocket(8, 40, 4, 5, 5, right_rocket, 2, material);
+			createBlackBase(right_rocket, 10, 2, 0, 9, 5);
+			createEngines(right_rocket, 10, 0.5, 0);
+			central_rocket.add(right_rocket);
+
+			//LOWER ROCKETS UNION
+			var material_chain = new THREE.MeshPhongMaterial({color: 0xd3d3d3});
+			var c = new THREE.Mesh(geometry, material_chain);
+			c.position.x = -5;
+			c.position.y = 8;
+			c.position.z = 0;
+			c.castShadow = true;
+			c.receiveShadow = true;
+			central_rocket.add(c);
+			var c = new THREE.Mesh(geometry, material_chain);
+			c.position.x = 5; 
+			c.position.y = 8; 
+			c.position.z = 0;
+			c.castShadow = true;
+			c.receiveShadow = true;
+			central_rocket.add(c);
+
+			//CENTRAL RING
+			var central_ring = new THREE.Object3D();
+			createRing(0, 41, 0, material_chain, central_ring, true);
+			central_ring.castShadow = true;
+			central_ring.receiveShadow = true;
+			central_rocket.add(central_ring);
+
+			//RIGHT RING
+			var right_ring = new THREE.Object3D();
+			createRing(10, 41, 0, material_chain, right_ring, false);
+			right_ring.castShadow = true;
+			right_ring.receiveShadow = true;
+			right_rocket.add(right_ring);
+
+			//LEFT RING
+			var left_ring = new THREE.Object3D();
+			createRing(-10, 41, 0, material_chain, left_ring, false);
+			left_ring.castShadow = true;
+			left_ring.receiveShadow = true;
+			left_rocket.add(left_ring);
+			//---------------------------------------------------------------------------
+
+
+			//SMOKE AND FIRE-------------------------------------------------------------
+			var smokeFire_central = new THREE.Object3D();
+			smoke_c = createSmokeFire(0, 0.5, 0, smokeFire_central, smoke_c);
+			central_rocket.add(smokeFire_central);
+
+			var smokeFire_right = new THREE.Object3D();
+			smoke_r = createSmokeFire(10, 0.5, 0, smokeFire_right, smoke_r);
+			right_rocket.add(smokeFire_right);
+
+			var smokeFire_left = new THREE.Object3D();
+			smoke_l = createSmokeFire(-10, 0.5, 0, smokeFire_left, smoke_l);
+			left_rocket.add(smokeFire_left);
+			//---------------------------------------------------------------------------
+
+
+			//CUBIC ACCELERATION OF THE ROCKET-------------------------------------------
+			//initial rocket position
+			var position = {y: 0};
+			var target = {y: 5500};
+			tween = new TWEEN.Tween(position).to(target, 5000).easing(TWEEN.Easing.Cubic.In); //cubic acceleration
+			
+			tween.onUpdate(function(){
+				central_rocket.position.y = position.y;
+			});
+
+			tween.onComplete( function() { //when the rocket is in the sky, remove the base
+				scene.remove(terrain);
+			});
+
+			tween.delay(6000); //the animation start after 6 seconds
+			tween.start();
+			//---------------------------------------------------------------------------
+
+
+			//CHANGE BACKGROUND COLOR WITH INTERPOLATION---------------------------------
+			//change background color from white to light blue
+			var color = { r : 240/255, g : 240/255, b : 240/255 }; //RGB color scaled in range [0-1]
+  			var endColor = { r : 173/255, g : 221/255, b : 250/255 };//RGB color scaled in range [0-1]
+  			tweenColor1 = new TWEEN.Tween(color).to(endColor, 4000);
+
+			tweenColor1.onUpdate(function() {
+				scene.background = new THREE.Color(color.r, color.g, color.b);
+			});
+
+  			tweenColor1.delay(7000);
+			tweenColor1.start();
+
+			//change background color from light blue to blue
+			var color2 = { r : 173/255, g : 221/255, b : 250/255 }; //RGB color scaled in range [0-1]
+  			var endColor2 = { r : 1/255, g : 4/255, b : 20/255 };//RGB color scaled in range [0-1]
+
+  			tweenColor2 = new TWEEN.Tween(color2).to(endColor2, 3000);
+
+			tweenColor2.onUpdate(function() {
+				scene.background = new THREE.Color(color2.r, color2.g, color2.b);
+			});
+
+			tweenColor1.chain( tweenColor2 );
+
+  			tweenColor2.delay(2000);
+
+  			//application cubemap
+  			tweenColor2.onComplete( function() {
+  				setTimeout(function(){  
+  					scene.background = cubemap; 
+				}, 2000);
+  			});
+			//---------------------------------------------------------------------------
+
+
+			//LIGHTS---------------------------------------------------------------------
+			var ambientLight = new THREE.AmbientLight( 0x404040 ); // soft white light
+			scene.add( ambientLight );
+
+			var width = 30;
+			var height = 30;
+			var intensity = 1;
+
+		    var light = new THREE.DirectionalLight( 0xFFAA55 );
+    		light.castShadow = true;
+    		light.position.set( 3, 80, 50 );
+    		light.shadow.camera.near = -100.5;
+    		light.shadow.camera.far = 500;
+			light.shadow.camera.left = -100;
+			light.shadow.camera.right = 100;
+			light.shadow.camera.top = 100;
+			light.shadow.camera.bottom = -100;
+    		scene.add( light );
+    		//---------------------------------------------------------------------------
+
+			
+			//STATS----------------------------------------------------------------------
+			stats = new Stats();
+			stats.domElement.style.position = 'absolute';
+			stats.domElement.style.top = '0px';
+			document.body.appendChild( stats.domElement );
+			//---------------------------------------------------------------------------
+
+			
+			controls = new THREE.OrbitControls( camera );
+			controls.addEventListener( 'change', Render );	
+		}
+
+
+		function Update() {
+			requestAnimationFrame( Update );
+
+			makeAnimationSmokeFire("central", smoke_c);
+			makeAnimationSmokeFire("right", smoke_r);
+			makeAnimationSmokeFire("left", smoke_l);
+				
+			TWEEN.update();
+
+			controls.update();  
+			stats.update();
+			Render();
+		}
+		
+
+		function Render() {	
+			renderer.render(scene, camera);
+		}
+		
+		Start();
+		Update();
+			
+		</script>
+	</body>
+</html>
